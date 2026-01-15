@@ -58,6 +58,8 @@ python extract_compute_pool_contrast_learning_saveT1.py \
 - `--num_workers`: Number of worker processes (default: 4)
 
 This script extracts compute pool features from the trained model and saves them for downstream analysis.
+The pretained checkpoint could be found in the following link.
+https://drive.google.com/file/d/1VvmKhfLDk-JVpbYgHMu_djLvdA7SItMr/view?usp=sharing
 
 ### Step 3: PCA Dimension Reduction
 
