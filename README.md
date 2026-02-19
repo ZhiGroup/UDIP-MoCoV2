@@ -87,6 +87,11 @@ Use the same CSV for train and val for a small demo. Training runs for 300 epoch
 
 **Rough timing (phantom dataset):** With the small phantom dataset (10 pairs), 100 epochs on an **NVIDIA H100** finish in about **15 minutes**. Adjust `--output-dir` and epoch count as needed.
 
+**Anticipated results**
+
+- **Small phantom dataset (10 pairs):** With very few samples, training loss does not decrease the way it does with large data and typically **stays around 3**. Linear CKA can reach about **0.9**, and the highest **retrieval recall@1** may go a bit **beyond 0.2**. This is expected for a tiny demo set.
+- **Real UK Biobank–scale data:** With many subjects and many negative pairs, you can expect **loss to go under 0.1**, **linear CKA around 0.99**, and **retrieval recall@1 over 0.83**.
+
 **Optional arguments:**
 
 | Argument | Description |
@@ -213,5 +218,4 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
-
 
