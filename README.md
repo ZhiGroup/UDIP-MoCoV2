@@ -85,7 +85,7 @@ python engine_128_T1_T2_mocov2_contrast_learning.py \
 
 Use the same CSV for train and val for a small demo. Training runs for 300 epochs by default; use `--resume` to continue from a checkpoint.
 
-**Rough timing (phantom dataset):** With the small phantom dataset (10 pairs), 100 epochs on an **NVIDIA H100** finish in about **15 minutes**. Adjust `--output-dir` and epoch count as needed.
+**Rough timing:** With the small phantom dataset (10 pairs), 100 epochs on a single **NVIDIA H100** finish in about **15 minutes**. For real UK Biobank–scale data, expect roughly **19 hours** on **4× H100** GPUs. Adjust `--output-dir` and epoch count as needed.
 
 **Anticipated results**
 
