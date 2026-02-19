@@ -23,11 +23,76 @@ pip install -r requirements.txt
 
 ### Step 1: Model Training
 
-Train the contrastive learning model using T1 and T2 MRI images:
+Train the contrastive learning model using **paired T1 and T2 MRI volumes**.
+
+#### Input
+
+- **Manifest CSV**: A CSV file where each row is one subject. Two columns must contain **absolute or relative paths** to 3D MRI volumes:
+  - One column for **T1** image paths
+  - One column for **T2** image paths  
+  Column names are configurable via `--modality-t1` and `--modality-t2` (see below).
+- **Volume format**: 3D neuroimaging volumes loadable with **NiBabel** (e.g. NIfTI `.nii`/`.nii.gz`, or MINC `.mnc` where supported). Each volume is normalized per-image (mean/std inside the brain mask) and padded as required by the model.
+
+#### Input structure (CSV)
+
+| Column (example names) | Content |
+|------------------------|--------|
+| `T1_unbiased_linear`   | Path to T1 volume for each subject |
+| `T2_unbiased_linear`   | Path to T2 volume for each subject |
+
+Example `manifest.csv`:
+
+```csv
+T1_unbiased_linear,T2_unbiased_linear
+/path/to/subject1_T1.nii.gz,/path/to/subject1_T2.nii.gz
+/path/to/subject2_T1.nii.gz,/path/to/subject2_T2.nii.gz
+```
+
+You can use different column names; pass them with `--modality-t1` and `--modality-t2`.
+
+#### How to run
+
+**Full training (with your own train/val CSV paths):**
 
 ```bash
-python engine_128_T1_T2_mocov2_contrast_learning.py [arguments]
+python engine_128_T1_T2_mocov2_contrast_learning.py \
+    --train-datafile /path/to/train_manifest.csv \
+    --val-datafile /path/to/val_manifest.csv \
+    [--modality-t1 T1_unbiased_linear] \
+    [--modality-t2 T2_unbiased_linear] \
+    [--resume /path/to/checkpoint.pth]
 ```
+
+**Demo with phantom MRI images**
+
+1. **Download the phantom MRI data** from Google Drive and place the files in a `phantom_MRI` folder (e.g. next to the repo or inside your project):
+   - **Download link**: [phantom_MRI (Google Drive)](https://drive.google.com/drive/folders/1AUO_2sAKgLI6UQyOfffdOQGlwwoTvkNv?usp=sharing)
+   - The folder contains paired T1 and T2 MINC volumes (e.g. `t1_icbm_normal_1mm_pn0_rf0.mnc`, `t2_icbm_normal_1mm_pn0_rf0.mnc`, and other variants).
+
+2. **Set paths**: Edit `phantom_MRI/phantom_manifest.csv` so that the directory in each path matches your download location. Replace `/data484_4/txia2/mocov2/phantom_MRI` with your full path to the `phantom_MRI` folder (e.g. `/your/workdir/phantom_MRI`).
+
+3. **Run training** from the repo directory:
+
+```bash
+cd /path/to/mocov2_repo
+
+python engine_128_T1_T2_mocov2_contrast_learning.py \
+    --train-datafile /path/to/phantom_MRI/phantom_manifest.csv \
+    --val-datafile /path/to/phantom_MRI/phantom_manifest.csv
+```
+
+Use the same CSV for train and val for a small demo. Training runs for 300 epochs by default; use `--resume` to continue from a checkpoint.
+
+**Optional arguments:**
+
+| Argument | Description |
+|----------|-------------|
+| `--train-datafile` | Path to CSV with T1/T2 paths for training |
+| `--val-datafile` | Path to CSV for validation (defaults to train CSV if only `--train-datafile` is set) |
+| `--modality-t1` | Column name for T1 paths (default: `T1_unbiased_linear`) |
+| `--modality-t2` | Column name for T2 paths (default: `T2_unbiased_linear`) |
+| `--resume` | Path to checkpoint to resume training |
+| `--start-epoch` | Epoch to start from (default: 0) |
 
 This script trains a MoCoV2-based dual encoder model that learns representations from paired T1 and T2 MRI scans using contrastive learning.
 
@@ -57,9 +122,7 @@ python extract_compute_pool_contrast_learning_saveT1.py \
 - `--batch_size`: Batch size for feature extraction (default: 32)
 - `--num_workers`: Number of worker processes (default: 4)
 
-This script extracts compute pool features from the trained model and saves them for downstream analysis.
-The pretained checkpoint could be found in the following link.
-https://drive.google.com/file/d/1VvmKhfLDk-JVpbYgHMu_djLvdA7SItMr/view?usp=sharing
+This script extracts compute pool features from the trained model and saves them for downstream analysis. The pretained checkpoint could be found in the following link. https://drive.google.com/file/d/1VvmKhfLDk-JVpbYgHMu_djLvdA7SItMr/view?usp=sharing
 
 ### Step 3: PCA Dimension Reduction
 
@@ -121,4 +184,29 @@ If you use this pipeline, please cite the relevant papers for:
 - MoCoV2 contrastive learning framework
 - Vision Transformer architecture
 - FastGWA method
+
+## License
+
+MIT License
+
+Copyright (c) 2026
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
 
