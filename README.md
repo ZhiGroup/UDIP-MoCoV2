@@ -27,28 +27,28 @@ Train the contrastive learning model using **paired T1 and T2 MRI volumes**.
 
 #### Input
 
-- **Manifest CSV**: A CSV file where each row is one subject. Two columns must contain **absolute or relative paths** to 3D MRI volumes:
+- **Manifest CSV**: A CSV file where each row is one subject. Two columns must contain paths to 3D MRI volumes:
   - One column for **T1** image paths
   - One column for **T2** image paths  
-  Column names are configurable via `--modality-t1` and `--modality-t2` (see below).
+  Paths may be **absolute** or **relative**. Relative paths are resolved relative to the manifest CSV’s directory (so you can use filenames only if the volumes live in the same folder as the CSV). Column names are configurable via `--modality-t1` and `--modality-t2` (see below).
 - **Volume format**: 3D neuroimaging volumes loadable with **NiBabel** (e.g. NIfTI `.nii`/`.nii.gz`, or MINC `.mnc` where supported). Each volume is normalized per-image (mean/std inside the brain mask) and padded as required by the model.
 
 #### Input structure (CSV)
 
 | Column (example names) | Content |
 |------------------------|--------|
-| `T1_unbiased_linear`   | Path to T1 volume for each subject |
-| `T2_unbiased_linear`   | Path to T2 volume for each subject |
+| `T1_unbiased_linear`   | Path to T1 volume for each subject (absolute or relative to manifest) |
+| `T2_unbiased_linear`   | Path to T2 volume for each subject (absolute or relative to manifest) |
 
-Example `manifest.csv`:
+Example with **relative paths** (portable: place CSV and volumes in the same folder):
 
 ```csv
 T1_unbiased_linear,T2_unbiased_linear
-/path/to/subject1_T1.nii.gz,/path/to/subject1_T2.nii.gz
-/path/to/subject2_T1.nii.gz,/path/to/subject2_T2.nii.gz
+t1_icbm_normal_1mm_pn0_rf0.mnc,t2_icbm_normal_1mm_pn0_rf0.mnc
+t1_icbm_normal_1mm_pn1_rf0.mnc,t2_icbm_normal_1mm_pn1_rf0.mnc
 ```
 
-You can use different column names; pass them with `--modality-t1` and `--modality-t2`.
+You can also use absolute paths. Column names can be overridden with `--modality-t1` and `--modality-t2`.
 
 #### How to run
 
@@ -65,13 +65,11 @@ python engine_128_T1_T2_mocov2_contrast_learning.py \
 
 **Demo with phantom MRI images**
 
-1. **Download the phantom MRI data** from Google Drive and place the files in a `phantom_MRI` folder (e.g. next to the repo or inside your project):
+1. **Download the phantom MRI data** from Google Drive and place the folder wherever you like (e.g. next to the repo):
    - **Download link**: [phantom_MRI (Google Drive)](https://drive.google.com/drive/folders/1AUO_2sAKgLI6UQyOfffdOQGlwwoTvkNv?usp=sharing)
-   - The folder contains paired T1 and T2 MINC volumes (e.g. `t1_icbm_normal_1mm_pn0_rf0.mnc`, `t2_icbm_normal_1mm_pn0_rf0.mnc`, and other variants).
+   - The folder contains paired T1 and T2 MINC volumes and a **phantom_manifest.csv** that lists them using **relative paths** (filenames only). The training script resolves these paths relative to the manifest’s directory, so you do not need to edit the CSV when moving the folder.
 
-2. **Set paths**: Edit `phantom_MRI/phantom_manifest.csv` so that the directory in each path matches your download location. Replace `/data484_4/txia2/mocov2/phantom_MRI` with your full path to the `phantom_MRI` folder (e.g. `/your/workdir/phantom_MRI`).
-
-3. **Run training** from the repo directory:
+2. **Run training** from the repo directory, passing the **full path to the manifest CSV**:
 
 ```bash
 cd /path/to/mocov2_repo
