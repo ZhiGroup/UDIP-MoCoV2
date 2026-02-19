@@ -54,10 +54,13 @@ You can also use absolute paths. Column names can be overridden with `--modality
 
 **Full training (with your own train/val CSV paths):**
 
+Set `--output-dir` to the directory where you want checkpoints and TensorBoard logs saved (create it or let the script create it).
+
 ```bash
 python engine_128_T1_T2_mocov2_contrast_learning.py \
     --train-datafile /path/to/train_manifest.csv \
     --val-datafile /path/to/val_manifest.csv \
+    --output-dir /path/to/your/output_folder \
     [--modality-t1 T1_unbiased_linear] \
     [--modality-t2 T2_unbiased_linear] \
     [--resume /path/to/checkpoint.pth]
@@ -69,17 +72,20 @@ python engine_128_T1_T2_mocov2_contrast_learning.py \
    - **Download link**: [phantom_MRI (Google Drive)](https://drive.google.com/drive/folders/1AUO_2sAKgLI6UQyOfffdOQGlwwoTvkNv?usp=sharing)
    - The folder contains paired T1 and T2 MINC volumes and a **phantom_manifest.csv** that lists them using **relative paths** (filenames only). The training script resolves these paths relative to the manifest’s directory, so you do not need to edit the CSV when moving the folder.
 
-2. **Run training** from the repo directory, passing the **full path to the manifest CSV**:
+2. **Set your output directory** and run training from the repo directory. Pass the **full path to the manifest CSV** and **`--output-dir`** where checkpoints and TensorBoard logs will be saved:
 
 ```bash
 cd /path/to/mocov2_repo
 
 python engine_128_T1_T2_mocov2_contrast_learning.py \
     --train-datafile /path/to/phantom_MRI/phantom_manifest.csv \
-    --val-datafile /path/to/phantom_MRI/phantom_manifest.csv
+    --val-datafile /path/to/phantom_MRI/phantom_manifest.csv \
+    --output-dir /path/to/your/output_folder
 ```
 
 Use the same CSV for train and val for a small demo. Training runs for 300 epochs by default; use `--resume` to continue from a checkpoint.
+
+**Rough timing (phantom dataset):** With the small phantom dataset (10 pairs), 100 epochs on an **NVIDIA H100** finish in about **15 minutes**. Adjust `--output-dir` and epoch count as needed.
 
 **Optional arguments:**
 
@@ -87,6 +93,7 @@ Use the same CSV for train and val for a small demo. Training runs for 300 epoch
 |----------|-------------|
 | `--train-datafile` | Path to CSV with T1/T2 paths for training |
 | `--val-datafile` | Path to CSV for validation (defaults to train CSV if only `--train-datafile` is set) |
+| `--output-dir` | Directory to save checkpoints and TensorBoard logs (default: `./output`); **set this to your desired output folder** |
 | `--modality-t1` | Column name for T1 paths (default: `T1_unbiased_linear`) |
 | `--modality-t2` | Column name for T2 paths (default: `T2_unbiased_linear`) |
 | `--resume` | Path to checkpoint to resume training |

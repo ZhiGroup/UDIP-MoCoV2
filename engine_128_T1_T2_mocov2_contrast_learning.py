@@ -768,28 +768,69 @@ class aedataset(torch.utils.data.Dataset):
         #mask = mask.int()
         return img, mask
 
+# Target 3D volume size for the model: (D, H, W) = 182 x 224 x 182
+TARGET_SHAPE = (182, 224, 182)
+
+
 class aedataset_T1T2(torch.utils.data.Dataset):
     """Dual modality dataset returning (T1, T2, mask_T1, mask_T2)."""
     def __init__(self, datafile, modality_T1, modality_T2):
         self.df = pd.read_csv(datafile)
         self.modality_T1 = modality_T1
         self.modality_T2 = modality_T2
+        # Resolve relative paths in CSV relative to the manifest's directory
+        self._manifest_dir = os.path.dirname(os.path.abspath(datafile)) or "."
 
     def __len__(self):
         return len(self.df)
 
+    def _resolve_path(self, path):
+        path = path.strip()
+        if not os.path.isabs(path):
+            path = os.path.join(self._manifest_dir, path)
+        return path
+
     def _load(self, path):
         img = nib.load(path).get_fdata()
-        img = torch.from_numpy(img)
-        img = torch.nn.functional.pad(img, (0,0,3,3,0,0))
+        img = torch.from_numpy(img).float()
+        if img.dim() == 4:
+            img = img.squeeze(0)
+        d, h, w = img.shape
+        target_d, target_h, target_w = TARGET_SHAPE
+        # Pad amount per dimension (how much to add to reach target)
+        pad_d = max(0, target_d - d)
+        pad_h = max(0, target_h - h)
+        pad_w = max(0, target_w - w)
+        # Split padding evenly (left/right, top/bottom, front/back)
+        pad_d_lo, pad_d_hi = pad_d // 2, pad_d - pad_d // 2
+        pad_h_lo, pad_h_hi = pad_h // 2, pad_h - pad_h // 2
+        pad_w_lo, pad_w_hi = pad_w // 2, pad_w - pad_w // 2
+        # F.pad 3D: (W_lo, W_hi, H_lo, H_hi, D_lo, D_hi)
+        img = torch.nn.functional.pad(
+            img,
+            (pad_w_lo, pad_w_hi, pad_h_lo, pad_h_hi, pad_d_lo, pad_d_hi),
+            mode="constant",
+            value=0,
+        )
+        # If any dimension was larger than target, center-crop to (182, 224, 182)
+        d2, h2, w2 = img.shape[0], img.shape[1], img.shape[2]
+        if d2 > target_d or h2 > target_h or w2 > target_w:
+            start_d = (d2 - target_d) // 2
+            start_h = (h2 - target_h) // 2
+            start_w = (w2 - target_w) // 2
+            img = img[
+                start_d : start_d + target_d,
+                start_h : start_h + target_h,
+                start_w : start_w + target_w,
+            ]
         mask = img != 0
         img = (img - img[mask].mean()) / img[mask].std()
         return img.float(), mask
 
     def __getitem__(self, idx):
         row = self.df.iloc[idx]
-        t1, m1 = self._load(row[self.modality_T1])
-        t2, m2 = self._load(row[self.modality_T2])
+        t1, m1 = self._load(self._resolve_path(row[self.modality_T1]))
+        t2, m2 = self._load(self._resolve_path(row[self.modality_T2]))
         return t1, t2, m1, m2
 
     
@@ -810,6 +851,11 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Train DeepENDO ViT model')
     parser.add_argument('--resume', type=str, help='path to checkpoint to resume from')
     parser.add_argument('--start-epoch', type=int, default=0, help='start epoch (default: 0)')
+    parser.add_argument('--train-datafile', type=str, default=None, help='CSV with columns for T1 and T2 image paths (train split)')
+    parser.add_argument('--val-datafile', type=str, default=None, help='CSV with columns for T1 and T2 image paths (validation split)')
+    parser.add_argument('--modality-t1', type=str, default='T1_unbiased_linear', help='column name for T1 paths in CSV')
+    parser.add_argument('--modality-t2', type=str, default='T2_unbiased_linear', help='column name for T2 paths in CSV')
+    parser.add_argument('--output-dir', type=str, default='./output', help='directory to save checkpoints and TensorBoard logs (default: ./output)')
     args = parser.parse_args()
 
     # Set PyTorch memory allocator configuration
@@ -889,7 +935,7 @@ if __name__ == "__main__":
     # Initialize gradient scaler for mixed precision training
     scaler = torch.cuda.amp.GradScaler()
 
-    dir_name = "/data484_4/txia2/DeepENDO/training/T1_128/output/mocov2_replicate2_fixed"
+    dir_name = args.output_dir
     os.makedirs(dir_name, exist_ok=True)
 
     if is_main_process:
@@ -897,27 +943,33 @@ if __name__ == "__main__":
     else:
         writer = None
 
-    # DataLoaders
+    # DataLoaders (use CLI paths if provided, else defaults)
+    train_csv = args.train_datafile or "/data4012/kpatel38/backups/autoencoder_ethnicity/train_mixed_ethnicity.csv"
+    val_csv = args.val_datafile or args.train_datafile or "/data4012/kpatel38/backups/autoencoder_ethnicity/val_mixed_ethnicity.csv"
     train_dataset = aedataset_T1T2(
-        datafile="/data4012/kpatel38/backups/autoencoder_ethnicity/train_mixed_ethnicity.csv",
-        modality_T1="T1_unbiased_linear",
-        modality_T2="T2_unbiased_linear"
+        datafile=train_csv,
+        modality_T1=args.modality_t1,
+        modality_T2=args.modality_t2
     )
     val_dataset = aedataset_T1T2(
-        datafile="/data4012/kpatel38/backups/autoencoder_ethnicity/val_mixed_ethnicity.csv",
-        modality_T1="T1_unbiased_linear",
-        modality_T2="T2_unbiased_linear"
+        datafile=val_csv,
+        modality_T1=args.modality_t1,
+        modality_T2=args.modality_t2
     )
     
     batch_size = 4
     num_workers = 4
-    
+    # For small datasets (e.g. phantom demo with 1 sample), use smaller batch and don't drop last
+    train_len = len(train_dataset)
+    effective_batch_size = min(batch_size, train_len) if train_len > 0 else 1
+    drop_last_train = (train_len >= batch_size) and (train_len > effective_batch_size)
+
     if dist.is_available() and dist.is_initialized():
-        train_sampler = DistributedSampler(train_dataset, shuffle=True, drop_last=True)
+        train_sampler = DistributedSampler(train_dataset, shuffle=True, drop_last=drop_last_train)
         val_sampler = DistributedSampler(val_dataset, shuffle=False, drop_last=False)
         train_loader = torch.utils.data.DataLoader(
-            train_dataset, batch_size=batch_size, pin_memory=True,
-            num_workers=num_workers, sampler=train_sampler, drop_last=True
+            train_dataset, batch_size=effective_batch_size, pin_memory=True,
+            num_workers=num_workers, sampler=train_sampler, drop_last=drop_last_train
         )
         val_loader = torch.utils.data.DataLoader(
             val_dataset, batch_size=batch_size, pin_memory=True,
@@ -925,8 +977,8 @@ if __name__ == "__main__":
         )
     else:
         train_loader = torch.utils.data.DataLoader(
-            train_dataset, batch_size=batch_size, pin_memory=True, 
-            num_workers=num_workers, shuffle=True, drop_last=True
+            train_dataset, batch_size=effective_batch_size, pin_memory=True,
+            num_workers=num_workers, shuffle=True, drop_last=drop_last_train
         )
         val_loader = torch.utils.data.DataLoader(
             val_dataset, batch_size=batch_size, pin_memory=True,
@@ -934,7 +986,7 @@ if __name__ == "__main__":
         )
 
     # Training Loop
-    num_epochs = 300
+    num_epochs = 100
     for epoch in range(start_epoch, num_epochs):
         if dist.is_available() and dist.is_initialized():
             train_sampler.set_epoch(epoch)
@@ -957,7 +1009,7 @@ if __name__ == "__main__":
             if writer and is_main_process:
                 writer.add_scalar('Loss/train_batch', loss.item(), epoch * len(train_loader) + i)
 
-        avg_train_loss = running_loss / len(train_loader)
+        avg_train_loss = running_loss / len(train_loader) if len(train_loader) > 0 else 0.0
         if writer and is_main_process:
             writer.add_scalar('Loss/train_epoch', avg_train_loss, epoch)
             writer.add_scalar('LR/train', optimizer.param_groups[0]['lr'], epoch)
@@ -989,8 +1041,8 @@ if __name__ == "__main__":
                 all_feat_T1.append(feat_T1)
                 all_feat_T2.append(feat_T2)
         
-        avg_val_loss = val_loss_sum / len(val_loader)
-        
+        avg_val_loss = val_loss_sum / len(val_loader) if len(val_loader) > 0 else 0.0
+
         # Concatenate features from this process
         if all_feat_T1:  # Only if we collected any features
             all_feat_T1 = torch.cat(all_feat_T1, dim=0)  # (N_local, embed_dim)
@@ -1019,7 +1071,7 @@ if __name__ == "__main__":
             # Compute CKA
             cka_linear = compute_cka(all_feat_T1, all_feat_T2, kernel='linear', center=True)
             cka_rbf = compute_cka(all_feat_T1, all_feat_T2, kernel='rbf', center=True)
-            
+
             # Log metrics to tensorboard
             if writer:
                 writer.add_scalar('Metrics/retrieval_top1_accuracy', retrieval_metrics['top1_accuracy'], epoch)
@@ -1029,7 +1081,7 @@ if __name__ == "__main__":
                     writer.add_scalar(f'Metrics/retrieval_{k}', recall, epoch)
                 writer.add_scalar('Metrics/CKA_linear', cka_linear, epoch)
                 writer.add_scalar('Metrics/CKA_rbf', cka_rbf, epoch)
-            
+
             # Print metrics
             print(f"  Retrieval - Top-1 Acc: {retrieval_metrics['top1_accuracy']:.4f}, "
                   f"Median Rank: {retrieval_metrics['median_rank']:.2f}, "
