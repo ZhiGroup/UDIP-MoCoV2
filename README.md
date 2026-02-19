@@ -68,6 +68,8 @@ python engine_128_T1_T2_mocov2_contrast_learning.py \
 
 **Demo with phantom MRI images**
 
+The phantom data is derived from simulated brain MRI (BrainWeb). https://brainweb.bic.mni.mcgill.ca/ **Cocosco, C.A., Kollokian, V., Kwan, R.K.-S., Evans, A.C.** *BrainWeb: Online Interface to a 3D MRI Simulated Brain Database.* NeuroImage, vol. 5, no. 4, part 2/4, S425, 1997.
+
 1. **Download the phantom MRI data** from Google Drive and place the folder wherever you like (e.g. next to the repo):
    - **Download link**: [phantom_MRI (Google Drive)](https://drive.google.com/drive/folders/1AUO_2sAKgLI6UQyOfffdOQGlwwoTvkNv?usp=sharing)
    - The folder contains paired T1 and T2 MINC volumes and a **phantom_manifest.csv** that lists them using **relative paths** (filenames only). The training script resolves these paths relative to the manifest’s directory, so you do not need to edit the CSV when moving the folder.
